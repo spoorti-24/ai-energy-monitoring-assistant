@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import {
   LineChart,
   Line,
@@ -225,16 +226,16 @@ function App() {
 
     try {
       /*
-       * Send the ACTUAL user question
+       * Send the actual user question
        * to the FastAPI backend.
        *
-       * The backend then:
+       * Backend flow:
        *
        * PostgreSQL
        *      ↓
        * Energy Analysis
        *      ↓
-       * Ollama / Gemma
+       * Gemini AI
        *      ↓
        * AI Response
        */
@@ -276,7 +277,7 @@ function App() {
       const assistantChat: ChatMessage = {
         sender: "assistant",
         text:
-          "I could not retrieve the AI response from the backend. Please make sure FastAPI and Ollama are running.",
+          "I could not retrieve the AI response from the backend. Please make sure FastAPI is running and the Gemini API configuration is available.",
       };
 
       setChatMessages((previous) => [
@@ -711,7 +712,13 @@ function App() {
                           ? "You: "
                           : "🤖 "}
 
-                        {chat.text}
+                        {chat.sender === "assistant" ? (
+                          <ReactMarkdown>
+                            {chat.text}
+                          </ReactMarkdown>
+                        ) : (
+                          chat.text
+                        )}
 
                       </div>
 
