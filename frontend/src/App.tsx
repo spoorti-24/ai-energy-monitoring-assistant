@@ -277,7 +277,7 @@ function App() {
       const assistantChat: ChatMessage = {
         sender: "assistant",
         text:
-          "I could not retrieve the AI response from the backend. Please make sure FastAPI is running and the Gemini API configuration is available.",
+          "I could not retrieve the AI response from the backend. Please make sure FastAPI is running.",
       };
 
       setChatMessages((previous) => [
@@ -650,51 +650,11 @@ function App() {
                       🤖 Hello! I'm your Energy Assistant.
 
                       <br />
+                      <br />
 
                       I use the latest energy analysis
                       from the system to answer your
                       questions.
-
-                      <br />
-                      <br />
-
-                      Try asking:
-
-                      <br />
-
-                      • Is my system healthy?
-
-                      <br />
-
-                      • Why does the system need attention?
-
-                      <br />
-
-                      • Is power consumption increasing?
-
-                      <br />
-
-                      • What is the power trend?
-
-                      <br />
-
-                      • What is the average power?
-
-                      <br />
-
-                      • What is the voltage?
-
-                      <br />
-
-                      • Is the power factor good?
-
-                      <br />
-
-                      • Is the frequency normal?
-
-                      <br />
-
-                      • Is the meter connected?
 
                     </div>
 
@@ -708,9 +668,8 @@ function App() {
                         className={`chat-message ${chat.sender}`}
                       >
 
-                        {chat.sender === "user"
-                          ? "You: "
-                          : "🤖 "}
+                        {chat.sender === "assistant" &&
+                          "🤖 "}
 
                         {chat.sender === "assistant" ? (
                           <ReactMarkdown>

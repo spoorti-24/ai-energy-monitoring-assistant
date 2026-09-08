@@ -1,4 +1,3 @@
-
 import re
 import os
 
@@ -335,6 +334,318 @@ def _looks_like_load_question(question: str) -> bool:
 
 
 # ==========================================================
+# SAFE ANALYSIS MESSAGE EXTRACTION
+# ==========================================================
+
+def _get_item_message(item) -> str:
+    """
+    Safely extract the message field from either
+    a dictionary or a Pydantic/object-style item.
+    """
+
+    if isinstance(item, dict):
+        return str(item.get("message", ""))
+
+    return str(
+        getattr(item, "message", item)
+    )
+
+
+# ==========================================================
+# SILENT FALLBACK RESPONSE
+# ==========================================================
+
+def generate_fallback_response(
+    user_question: str,
+    analysis: dict,
+    telemetry=None
+) -> str:
+    """
+    Generate a useful response using trusted telemetry
+    and energy analysis when the external AI service
+    is unavailable.
+
+    No external-service error is exposed to the user.
+    """
+
+    normalized_question = normalize_question(
+        user_question
+    )
+
+    if telemetry is None:
+        return (
+            "Current energy data is not available."
+        )
+
+    overall_status = analysis.get(
+        "overall_status",
+        "Unknown"
+    )
+
+    findings = analysis.get(
+        "findings",
+        []
+    )
+
+    trends = analysis.get(
+        "trends",
+        []
+    )
+
+    # ======================================================
+    # DIRECT MEASUREMENTS
+    # ======================================================
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "current"
+    ):
+        return (
+            f"The current measured by the meter is "
+            f"{telemetry.current} A."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "voltage"
+    ):
+        return (
+            f"The voltage measured by the meter is "
+            f"{telemetry.voltage} V."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "active_power"
+    ):
+        return (
+            f"The active power measured by the meter is "
+            f"{telemetry.active_power} kW."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "reactive_power"
+    ):
+        return (
+            f"The reactive power measured by the meter is "
+            f"{telemetry.reactive_power} kVAR."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "apparent_power"
+    ):
+        return (
+            f"The apparent power measured by the meter is "
+            f"{telemetry.apparent_power} kVA."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "power_factor"
+    ):
+        return (
+            f"The current power factor measured by the meter is "
+            f"{telemetry.power_factor}."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "frequency"
+    ):
+        return (
+            f"The frequency measured by the meter is "
+            f"{telemetry.frequency} Hz."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "energy"
+    ):
+        return (
+            f"The recorded energy consumption is "
+            f"{telemetry.energy} kWh."
+        )
+
+    if _is_exact_measurement_question(
+        normalized_question,
+        "demand"
+    ):
+        return (
+            f"The recorded demand is "
+            f"{telemetry.demand} kW."
+        )
+
+    # ======================================================
+    # SYSTEM HEALTH
+    # ======================================================
+
+    health_words = [
+        "health",
+        "healthy",
+        "system status",
+        "condition",
+        "condition of system",
+        "system condition",
+    ]
+
+    if any(
+        word in normalized_question
+        for word in health_words
+    ):
+
+        response = (
+            f"**System Status:** {overall_status}\n\n"
+            f"**Current Measurements:**\n"
+            f"- Voltage: {telemetry.voltage} V\n"
+            f"- Current: {telemetry.current} A\n"
+            f"- Active Power: {telemetry.active_power} kW\n"
+            f"- Power Factor: {telemetry.power_factor}\n"
+            f"- Frequency: {telemetry.frequency} Hz"
+        )
+
+        if findings:
+
+            response += (
+                "\n\n**Findings:**\n"
+            )
+
+            for finding in findings:
+
+                message = _get_item_message(
+                    finding
+                )
+
+                if message:
+                    response += (
+                        f"- {message}\n"
+                    )
+
+        return response
+
+    # ======================================================
+    # TREND QUESTIONS
+    # ======================================================
+
+    trend_words = [
+        "trend",
+        "trends",
+        "increasing",
+        "decreasing",
+        "increase",
+        "decrease",
+        "consumption trend",
+        "power trend",
+        "current trend",
+        "voltage trend",
+        "energy trend",
+    ]
+
+    if any(
+        word in normalized_question
+        for word in trend_words
+    ):
+
+        if trends:
+
+            response = (
+                "**Energy Trends:**\n\n"
+            )
+
+            for trend in trends:
+
+                message = _get_item_message(
+                    trend
+                )
+
+                if message:
+                    response += (
+                        f"- {message}\n"
+                    )
+
+            return response
+
+        return (
+            "There is not enough historical data "
+            "to determine a reliable trend."
+        )
+
+    # ======================================================
+    # FINDINGS / PROBLEMS / EFFICIENCY
+    # ======================================================
+
+    analysis_words = [
+        "problem",
+        "problems",
+        "issue",
+        "issues",
+        "abnormal",
+        "fault",
+        "faults",
+        "efficiency",
+        "efficient",
+        "high consumption",
+        "consumption",
+        "recommendation",
+        "recommendations",
+    ]
+
+    if any(
+        word in normalized_question
+        for word in analysis_words
+    ):
+
+        response = (
+            f"**System Status:** {overall_status}\n\n"
+        )
+
+        if findings:
+
+            response += (
+                "**Analysis Findings:**\n\n"
+            )
+
+            for finding in findings:
+
+                message = _get_item_message(
+                    finding
+                )
+
+                if message:
+                    response += (
+                        f"- {message}\n"
+                    )
+
+        else:
+
+            response += (
+                "No specific abnormal condition "
+                "has been identified from the available "
+                "energy analysis."
+            )
+
+        return response
+
+    # ======================================================
+    # GENERAL ENERGY INFORMATION
+    # ======================================================
+
+    return (
+        f"**Current Energy Status:** {overall_status}\n\n"
+        f"- Voltage: {telemetry.voltage} V\n"
+        f"- Current: {telemetry.current} A\n"
+        f"- Active Power: {telemetry.active_power} kW\n"
+        f"- Reactive Power: {telemetry.reactive_power} kVAR\n"
+        f"- Apparent Power: {telemetry.apparent_power} kVA\n"
+        f"- Power Factor: {telemetry.power_factor}\n"
+        f"- Frequency: {telemetry.frequency} Hz\n"
+        f"- Energy: {telemetry.energy} kWh\n"
+        f"- Demand: {telemetry.demand} kW"
+    )
+
+
+# ==========================================================
 # MAIN GEMINI RESPONSE FUNCTION
 # ==========================================================
 
@@ -352,6 +663,7 @@ def generate_llm_response(
     - deterministic logic for trusted meter readings
     - deterministic engineering safety logic
     - Gemini for explanations, analysis, trends and conversation
+    - silent telemetry/analysis fallback if Gemini fails
     """
 
     original_question = user_question.strip()
@@ -802,14 +1114,15 @@ Now answer the user naturally.
 """
 
     # ======================================================
-    # CHECK GEMINI CONFIGURATION
+    # SILENT FALLBACK IF GEMINI IS NOT CONFIGURED
     # ======================================================
 
     if client is None:
 
-        return (
-            "The Gemini AI service is not configured. "
-            "Please check GEMINI_API_KEY in backend/.env."
+        return generate_fallback_response(
+            user_question=original_question,
+            analysis=analysis,
+            telemetry=telemetry
         )
 
     # ======================================================
@@ -829,48 +1142,30 @@ Now answer the user naturally.
             else ""
         )
 
+        # ==================================================
+        # EMPTY GEMINI RESPONSE
+        # ==================================================
+
         if not ai_response:
 
-            return (
-                "The AI assistant could not generate a response."
+            return generate_fallback_response(
+                user_question=original_question,
+                analysis=analysis,
+                telemetry=telemetry
             )
 
         return ai_response
 
-    except Exception as error:
+    # ======================================================
+    # ANY GEMINI FAILURE
+    # ======================================================
 
-        error_text = str(error).lower()
+    except Exception:
 
-        if "api key" in error_text or "authentication" in error_text:
-
-            return (
-                "The Gemini API authentication failed. "
-                "Please check the Gemini API key in backend/.env."
-            )
-
-        if "quota" in error_text or "rate limit" in error_text:
-
-            return (
-                "The Gemini API usage limit has been reached. "
-                "Please try again later."
-            )
-
-        if "timeout" in error_text:
-
-            return (
-                "The Gemini AI service took too long to respond. "
-                "Please try again."
-            )
-
-        if "404" in error_text or "not found" in error_text:
-
-            return (
-                "The configured Gemini model is unavailable. "
-                "Please check the Gemini model configuration."
-            )
-
-        return (
-            "The AI assistant could not generate a response "
-            "from Gemini. The energy analysis is still available."
+        # Do not expose Gemini errors to the user.
+        # Silently use trusted telemetry and analysis.
+        return generate_fallback_response(
+            user_question=original_question,
+            analysis=analysis,
+            telemetry=telemetry
         )
-
